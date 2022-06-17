@@ -3,136 +3,392 @@ import { theme as customizedTheme } from "./theme";
 export const theme = customizedTheme;
 
 <Head>
-  <title>Presentation title</title>
+  <title>fp-ts</title>
 </Head>
 
-# Presentation title
+<img
+  src="https://github.com/gcanti/fp-ts/raw/master/docs/fp-ts-logo.png"
+  alt="fp-ts logo"
+  width={150}
+/>
 
-Author: XYZ
+# fp-ts
 
----
-
-<Split>
-
-## Task for today
-
-Using a different layout
-
-- List item 1
-- List item 2
-
-See
-[layouts documentation](https://github.com/jxnblk/mdx-deck/blob/master/docs/layouts.md)
-for more information about layouts.
-
-<Notes>Presenter notes are also available</Notes>
-
-</Split>
+Kicking TypeScript strictness up a notch
 
 ---
 
-## A numbered list with steps
+```typescript
+const fetchPerson = (personId: number) =>
+  fetch(`https://swapi.dev/api/people/${personId}/`).then((res) => res.json());
+
+fetchPerson(1).then((person) => {
+  console.log(person.name);
+});
+```
+
+In what ways can this code fail?
+
+---
+
+```typescript
+const fetchPerson = (personId: number) =>
+  fetch(`https://swapi.dev/api/people/${personId}/`).then((res) => res.json());
+
+fetchPerson(1)
+  .then((person) => {
+    console.log(person.name);
+  })
+  .catch((error) => {
+    // What's the type of error?
+    console.log(error);
+  });
+```
+
+---
+
+import typeOfErrorInPromise from "./static/type-of-error-in-promise.png";
+
+<img src={typeOfErrorInPromise} alt="Type of rejected value in promises" />
+
+No help from the compiler about the possible failures.
+
+Let's find out why
+
+---
+
+import promiseTypeDefinition from "./static/promise-type-definition.png";
+
+<img src={promiseTypeDefinition} alt="Promise type definition" />
+
+- Only one generic parameter - for the resolved value
+- The rejected value has type `any`
+
+---
+
+# What does it affect?
+
+---
+
+import genericErrorHandler from "./static/generic-error-handler.png";
+
+## Example error handler
+
+<img
+  src={genericErrorHandler}
+  alt="Generic error handler that cannot tell what the problem was"
+/>
+
+- No clue what the cause of the error is
+- _wrong password?_
+- Still better than nothing
+
+---
+
+import anotherGenericErrorHandler from "./static/another-generic-error-handler.png";
+
+<img
+  src={anotherGenericErrorHandler}
+  alt="Another generic error handler that cannot tell what the problem was"
+/>
+
+- Which operation failed?
+- Was it an expected error (e.g. 400) or an unexpected error (a JS runtime
+  error)?
+
+---
+
+# Add error type to `Promise`?
+
+1. Proposal for `Promise` rejection types
+
+   <https://github.com/microsoft/TypeScript/issues/39680>
+
+   Opened in July 2020.
+
+2. Proposal for keeping track of types of rejections
+
+   <https://github.com/microsoft/TypeScript/issues/13219>
+
+   Opened in December 2016.
+
+---
+
+# What else can we do in the meantime?
 
 <Steps>
 
-1. First
-2. Second
-3. Third, the last one
+- Only resolved `Promise` values have types
+- What if we resolved with an error or a valid value?
 
 </Steps>
 
 ---
 
-## An unordered list with steps
+```typescript
+type Result<T, E> =
+  | {
+      type: "ok";
+      value: T;
+    }
+  | { type: "error"; error: E };
 
-<Steps>
+const safeFetch = (
+  ...args: Parameters<typeof fetch>
+): Promise<Result<Response, "network-error">> =>
+  fetch(...args).then(
+    (res) => ({ type: "ok", value: res }),
+    (_error) => ({
+      type: "error",
+      error: "network-error",
+    }),
+  );
 
-- First
-- Second
-- Third, the last one
+const ensureResponseOk = (
+  response: Response,
+): Result<Response, "response-not-ok"> => {
+  if (response.ok) {
+    return {
+      type: "ok",
+      value: response,
+    };
+  }
 
-</Steps>
+  return {
+    type: "error",
+    error: "response-not-ok",
+  };
+};
+
+const safeResponseJSON = (
+  response: Response,
+): Promise<Result<unknown, "json-parse-error">> =>
+  response.json().then(
+    (parsedValue) => ({ type: "ok", value: parsedValue }),
+    (_error) => ({ type: "error", error: "json-parse-error" }),
+  );
+
+const fetchPerson = (personId: number) =>
+  safeFetch(`https://swapi.dev/api/people/${personId}/`)
+    .then((result) =>
+      result.type === "ok" ? ensureResponseOk(result.value) : result,
+    )
+    .then(
+      (
+        result,
+      ): Promise<
+        Result<
+          unknown,
+          "network-error" | "response-not-ok" | "json-parse-error"
+        >
+      > => {
+        if (result.type === "error") {
+          return Promise.resolve(result);
+        }
+
+        return safeResponseJSON(result.value);
+      },
+    );
+
+fetchPerson(1).then((result) => {
+  if (result.type === "error") {
+    if (result.error === "network-error") {
+      console.log("There was a network error. You may be offline");
+    } else if (result.error === "response-not-ok") {
+      console.log("Server returned with an error");
+    } else if (result.error === "json-parse-error") {
+      console.log("Could not parse the result from the server");
+    } else {
+      // Has type `never`
+      result.error;
+    }
+    return;
+  }
+
+  const person = result.value;
+  console.log(person.name);
+});
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/C4TwDgpgBAShDOBXANsAPAFQDRQKID4oBeAKCigB8oBvM8+0SALigCIB7Aa1YG476oANwCGyRBBYY+AgL50q1KIwlsIAJzXs1vKOs1qWuKDL4kAxuwB28YFHjCAZhABiEYGYAWxKAAo6AOkDhNQBzeBYABWDhAFs3dXg0ZXYHKCd3D3wSAEpIzRiAS3gINDgkVFKEMCtinFZLNwB3LU4AWj0tVnxCIizydM8fQP9gsOz-YA8ISz8BHzUEbOJCH0VlFg5uHBExFQX4Y2ysfl8AfQ61Jd7fWgFyddUNTuO73SeDNgbgZrU2i9YXvQZEc6NlTBZrLZ7E4ytVrBAAFIAZQA8gA5byzKD7OHFFiwmoQY65KARfJFEplFDoRCWTiWdiNSx1ABW8CsrTAwWK7XeXR6fWxVUJ-jZVh840m0yx5B8XLUxQAJgA1UTiK4rNbgFSbAFCNUqeVK1W7Q6A2Xnd4am5KbUbf44C4bMWWTnciC8-SsM2g8E1WwDDwRBJWTGQBVWACSipYlkQMQARuoNXRoS43IMAAYeYDAMDhAD0BfgjWEYAK-kVEEEBbLBQLkHYYGQEALABJqOH2ZZozIC5nJVMZicZfR9tTzVASWT2IVipVyjS6QymXUvj8-nzKGwXW6FR7-t1ljQTuQCql5ghqRNtcQiERHl6lrdXkLgIg1JZSeTiv59uxkEECBL0XMFT2MEhwIWd9PzsRwIAJeFkXREDrx2dVpCBQEwJIQNgwjGYAEZB2lVDUGtF9z18cdUBvSA7wfVh-mfE4qLI4B-AuBjPiaFpPU6FjXghdkW38ZB2BCHxWAwKYFigUsDmEKB1xaN59H8KAAE12EQKAYmEEAoCTKAUgcZACgaVgwNkXRkGKKA2JojiuPvRjdyNA8+UEu5hIAiAxIkqSAGEdOQRVlPYWwPKUKYhUXNJ8hi6BijUIDtGsoFbPsl8BCLKAAAlhAOZQoEzBo0szKCr1oi5MPIOQBGgj9LEwuQ6GEqKQy-B8nP8dCIEw3zRPEySuysfxLFiCAwOBHggA)
 
 ---
 
-## Slide with code
+# Benefits 👌
 
-```javascript
-const withSome = "code";
+1. Precise error propagation
+
+   Each function defines what it can fail with.
+
+2. Precise error cause is known during _unwrapping_
+
+3. Rejected promises are resolved for _unexpected errors_
+
+---
+
+# Not great 😾
+
+```typescript
+const fetchPerson = (personId: number) =>
+  safeFetch(`https://swapi.dev/api/people/${personId}/`)
+    .then((result) =>
+      // manual error propagation -> boilerplate              VVVVVV
+      result.type === "ok" ? ensureResponseOk(result.value) : result,
+    )
+    .then(
+      (
+        result,
+      ): Promise<
+        Result<
+          unknown,
+          // manual type annotation to combine error types
+          "network-error" | "response-not-ok" | "json-parse-error"
+        >
+      > => {
+        if (result.type === "error") {
+          // manual error propagation -> boilerplate
+          return Promise.resolve(result);
+        }
+
+        return safeResponseJSON(result.value);
+      },
+    );
 ```
 
-```tsx
-interface AlsoTypescript {
-  a: number;
+1. Manual error propagation => boilerplate
+2. Manual type annotation to combine error types
+
+---
+
+# What if we abstracted that into a library?
+
+You can probably see where this is going...
+
+---
+
+# fp-ts `Either` type
+
+```typescript
+export interface Left<E> {
+  readonly _tag: "Left";
+  readonly left: E;
 }
 
-const AndTSX = <div />;
-```
-
----
-
-## An image with some caption
-
-import { ImageWithLabel } from "./components/ImageWithLabel";
-
-<ImageWithLabel label="Themes in mdx-deck">
-  <img src="https://github.com/jxnblk/mdx-deck/raw/master/docs/images/future.png" />
-</ImageWithLabel>
-
----
-
-## A gif
-
-<img src="https://media.giphy.com/media/bcKmIWkUMCjVm/giphy.gif" />
-
----
-
-## A video with controls
-
-<video
-  src="https://media.giphy.com/media/3oriO0OEd9QIDdllqo/giphy.mp4"
-  controls
-/>
-
----
-
-## A video controlled with steps
-
-Press Right/Left to play/pause the video.
-
-import { PostponedVideo } from "./components/PostponedVideo";
-
-<PostponedVideo
-  src="https://media.giphy.com/media/3oriO0OEd9QIDdllqo/giphy.mp4"
-  loop
-  controls
-/>
-
----
-
-## Highlighting other languages
-
-```python
-[f(x) if x is not None else '' for x in xs]
-```
-
-```rust
-struct Rust {
-  field: Rc<RefCell<SomeOtherStruct>>;
+export interface Right<A> {
+  readonly _tag: "Right";
+  readonly right: A;
 }
+
+export type Either<E, A> = Left<E> | Right<A>;
 ```
 
-```ruby
-def sum_eq_n?(arr, n)
-  return true if arr.empty? && n == 0
-  arr.product(arr).reject { |a,b| a == b }.any? { |a,b| a + b == n }
-end
-```
+[GitHub source code](https://github.com/gcanti/fp-ts/blob/34b28fa9a6c968529f689db1f71d2ef0a91ea4b6/src/Either.ts#L67-L85)
 
 ---
 
-## Questions
+# `Result` vs `Either`
+
+1. Our `Result<T, E>` is `Either<E, T>` (error comes first)
+2. `Either` has explicit types for `Left` (our `error`) and `Right` (our `ok`)
+
+   Right - a synonym for correct, which is why it is the _ok_ case.
 
 ---
 
-Thank you for your participation.
+# Rewrite it in ~~Rust~~ fp-ts
+
+```typescript
+import { either } from "fp-ts";
+
+const safeFetch = (
+  ...args: Parameters<typeof fetch>
+): Promise<either.Either<"network-error", Response>> =>
+  fetch(...args).then(either.right, (_error) => either.left("network-error"));
+//                  ^^^^^^^^^^^^              ^^^^^^^^^^^
+// constructor functions for `Left` (error) and `Right` (ok) variants
+
+const ensureResponseOk = (
+  response: Response,
+): either.Either<"response-not-ok", Response> => {
+  //            ^^^^^^^^^^^^^^^^^ error comes first
+  if (response.ok) {
+    return either.right(response);
+  }
+
+  return either.left("response-not-ok");
+};
+
+const safeResponseJSON = (
+  response: Response,
+): Promise<either.Either<"json-parse-error", unknown>> =>
+  response
+    .json()
+    .then(either.right, (_error) => either.left("json-parse-error"));
+
+const fetchPerson = (personId: number) =>
+  safeFetch(`https://swapi.dev/api/people/${personId}/`)
+    .then(either.chainW(ensureResponseOk))
+    //           ^^^^^^ automatic error propagation through `chain`
+    .then<
+      either.Either<
+        "network-error" | "response-not-ok" | "json-parse-error",
+        // Unfortunately, we still enumerate the errors manually
+        unknown
+      >
+    >(
+      either.matchW(
+        //   ^^^^^^ built-in functions to cleanly unwrap the result
+        (error) => Promise.resolve(either.left(error)),
+        // ^^ error case handler
+        safeResponseJSON,
+        // ^^ "ok" case handler
+      ),
+    );
+
+fetchPerson(1).then(
+  either.match(
+    (error) => {
+      if (error === "network-error") {
+        console.log("There was a network error. You may be offline");
+      } else if (error === "response-not-ok") {
+        console.log("Server returned with an error");
+      } else if (error === "json-parse-error") {
+        console.log("Could not parse the result from the server");
+      } else {
+        // Has type `never`
+        error;
+      }
+    },
+    (person) => {
+      console.log(person.name);
+    },
+  ),
+);
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzgU2DAFsqcC+cBmUEIcARPmALQwDOpA3AFCMDGEAdjfDQIb7IAxZDBbo4AXjgAKRnDgA6RTygBzGgC44ABWU8QwrDQA8MAJ5hkEfAWGiAfIwCUmrURDAayI6gxZ5AUTRMKCNSdmEAd2gAa0osIihSABo4ACVkGkhOZDs7CQc5fhF0KUV5ZTVHeV92KR9g+ShgFXQYFKkAfXjoR3yUIL8AG2R8GCkwyJi4qATSR0cmVg4uFE4AVyhkdMzl5AB5aIlpWThNnezNbazPJKdNer9A3xDSM+vkSnYIGEoIaOS0hl3nlxHkECdgNYpG9dvI-r1wXI5JsYBt2P1no1mq1oUDdgsTjhmMjhGiMQ1hqNxjDsp9vr9-gScIs2JxuHwtnjsgApADKewAckcZCTzp5LlybndtG4PF4HlAAgMXgArGgcShgZSeaazFJrdjRL4Rdi5fInGmeE5yeRqjhSRzWhQ1OrKrEtNrSLozHp9BXySljUh29ia7UfbqJeYs5bwIqiLSGDjCixQdXsACSABNNOw1iAAEZYXqgk68fhCYpSAAGrRgYA0AHpGzQIjwwMB5FnkAA3Rvt4CNiwQMDDRsAEgQqfT2ZwjerjqRzswtX9oh4wHYAHU6utNlddgd5k7qiujE65P6nsFz0ulxMYFEoLFI6Q4AAfMiWj5fH5-N+fsG6ZhmmEY+oktx3kiBpGhAJoXnABRInYIp3v6IA8MUO4IXIdTgSWeSuMQcqNBkECDD2yCupigZ4Qk8yQVBcDlpyYrIHygqMUujhcXABKMPG6CJmm9oAIxVC6JzoZhoiobhkYEYgCGQtIkYSOIkgPk+L7gXMSlMXArLqsMAYQCo4wACrBMgcBtjQcA8HA4SPjEKDgfIcAAJoQGscAYaYcBFnAVj4IMm7IHMTBQXgyCDJ4cAqXR0DqZp350n+jL6UxRnkcgpnmaQvJYJR2AomiyBZrZQQOeir4EtFKBxTZiVqRpmkhiBOp1VlUE5SZgxmeMADCPmDJVv5wFqoFwL4pwZGsgxxm4M2YMxxVYJFCExU1PV3s2cAABI8PZZgWHA1bhCV1Y4W5CRRXeRJLjgvFSNOHCKYid59XlA3mW97DyOwejIPVSLPScPFOEwQA)
+
+---
+
+# Basic operations on `Either`
+
+1. Construction
+
+2. `map`
+
+3. `chain` (and `chainW`)
+
+4. `match`
+
+---
+
+To do:
+
+- `pipe`
+- `task`
+- `taskEither`
+- `flow`
+- how to deal with fp-ts errors (add more type annotations)
+- `Option` (when `strictNullChecks: false`) vs `undefined`
+- other modules with helper functions, e.g. for working with arrays
+- Q&A
