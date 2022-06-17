@@ -10,5 +10,8 @@ export const theme = {
       objectFit: "contain",
       height: "auto",
     },
+    a: {
+      color: "#F94569",
+    },
   },
 };
