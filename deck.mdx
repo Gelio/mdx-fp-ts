@@ -453,9 +453,12 @@ Again, `Left` value is propagated.
 - `map` (callback `(x: A) => B`)
 
   - change the inner _Right_ value in a way that **cannot** fail
+  - if you squint, the type look like `Array.prototype.map`
 
 - `chain` (callback `(x: A) => Either<E, B>`)
+
   - change the inner _Right_ value in a way that **can** fail
+  - if you squint, the type look like `Array.prototype.flatMap`
 
 ---
 
