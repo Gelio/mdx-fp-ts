@@ -223,13 +223,13 @@ fetchPerson(1).then((result) => {
 
 # Benefits 👌
 
-1. Precise error propagation
+1. Precise error cause is known during _unwrapping_
 
    Each function defines what it can fail with.
 
-2. Precise error cause is known during _unwrapping_
+2. Error propagation
 
-3. Rejected promises are resolved for _unexpected errors_
+3. Promises are rejected only for _unexpected errors_
 
 ---
 
@@ -421,7 +421,7 @@ The `Left` value was unmodified - error propagation.
 
 ---
 
-## Chaining
+## Chain
 
 Like `either.map`, but the callback should return the result wrapped in
 `Either`.
@@ -437,7 +437,7 @@ const mappedRightResult = either.chain(callback)(rightResult);
 expect(mappedRightResult).toEqual(either.right(20));
 
 const smallRightResult = either.right(1);
-const mappedSmallRightResult = either.map(callback)(smallRightResult);
+const mappedSmallRightResult = either.chain(callback)(smallRightResult);
 expect(mappedSmallRightResult).toEqual(either.left("too small x"));
 ```
 
@@ -676,7 +676,8 @@ result().then((value) => {
 
 # Asynchronous failures
 
-- `Task` must never fail. The `Promise` must always resolve with some value `T`
+- `Task` must never reject. The `Promise` must always resolve with some value
+  `T`
 - Use `Either` as `T` to resolve with an error
 
 ```typescript
