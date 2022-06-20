@@ -18,6 +18,14 @@ Kicking TypeScript strictness up a notch
 
 ---
 
+# Goals
+
+1. Get you all excited about fp-ts
+2. Show how fp-ts can compliment your existing code
+3. Help understand how to read fp-ts code
+
+---
+
 ```typescript
 const fetchPerson = (personId: number) =>
   fetch(`https://swapi.dev/api/people/${personId}/`).then((res) => res.json());
@@ -304,13 +312,13 @@ const safeFetch = (
   ...args: Parameters<typeof fetch>
 ): Promise<either.Either<"network-error", Response>> =>
   fetch(...args).then(either.right, (_error) => either.left("network-error"));
-//                  ^^^^^^^^^^^^              ^^^^^^^^^^^
+//                    ^^^^^^^^^^^^              ^^^^^^^^^^^
 // constructor functions for `Left` (error) and `Right` (ok) variants
 
 const ensureResponseOk = (
   response: Response,
 ): either.Either<"response-not-ok", Response> => {
-  //            ^^^^^^^^^^^^^^^^^ error comes first
+  //             ^^^^^^^^^^^^^^^^^ error comes first
   if (response.ok) {
     return either.right(response);
   }
@@ -372,23 +380,567 @@ fetchPerson(1).then(
 
 # Basic operations on `Either`
 
-1. Construction
-
-2. `map`
-
-3. `chain` (and `chainW`)
-
-4. `match`
+[Either documentation](https://gcanti.github.io/fp-ts/modules/Either.ts.html)
 
 ---
 
-To do:
+# Constructing `Either`
 
-- `pipe`
-- `task`
-- `taskEither`
-- `flow`
-- how to deal with fp-ts errors (add more type annotations)
-- `Option` (when `strictNullChecks: false`) vs `undefined`
-- other modules with helper functions, e.g. for working with arrays
-- Q&A
+```typescript
+import { either } from "fp-ts";
+
+either.left("some error"); // either.Either<string, never>
+either.right(123); // either.Either<never, number>
+
+either.of(123); // equivalent to either.right(123)
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzgU2DAFsqcC+cBmUEIcA5PmALQwDOpA3AFCOoZYB0ANsvjABQAiGsWQooRKAICU9OAHo5KNJijsAosqwAeGjCjAAdgHMANHAPIAblgB8LTav1H0-AIwAmAMwz5i1ivUHLQtrKDMDAFcQACNbZn8OCHw+D29ZBRQARwjgSwBDbgN4GAglNkdgZzcvKSA)
+
+---
+
+## Mapping the _ok_ value
+
+Like `Array.prototype.map`, but only maps the `Right` value.
+
+```typescript
+import { either } from "fp-ts";
+
+const rightResult = either.right(5);
+const mappedRightResult = either.map((x: number) => x * 2)(rightResult);
+expect(mappedRightResult).toEqual(either.right(10));
+
+const leftResult = either.left("some error");
+const mappedLeftResult = either.map((x: number) => x * 2)(leftResult);
+expect(mappedLeftResult).toEqual(either.left("some error"));
+```
+
+The `Left` value was unmodified - error propagation.
+
+---
+
+## Chaining
+
+Like `either.map`, but the callback should return the result wrapped in
+`Either`.
+
+```typescript
+import { either } from "fp-ts";
+
+const callback = (x: number) =>
+  x < 5 ? either.left("too small x") : either.right(x * 2);
+
+const rightResult = either.right(10);
+const mappedRightResult = either.chain(callback)(rightResult);
+expect(mappedRightResult).toEqual(either.right(20));
+
+const smallRightResult = either.right(1);
+const mappedSmallRightResult = either.map(callback)(smallRightResult);
+expect(mappedSmallRightResult).toEqual(either.left("too small x"));
+```
+
+The callback can decide whether the value is valid or an error.
+
+Again, `Left` value is propagated.
+
+---
+
+## `map` vs `chain`
+
+- `map` (callback `(x: A) => B`)
+
+  - change the inner _Right_ value in a way that **cannot** fail
+
+- `chain` (callback `(x: A) => Either<E, B>`)
+  - change the inner _Right_ value in a way that **can** fail
+
+---
+
+## Unwrap the result with `match`
+
+```typescript
+import { either } from "fp-ts";
+
+const result = either.right(123);
+
+either.match(
+  (error) => {
+    // Process the `Left` error
+  },
+  (value) => {
+    // Process the `Right` value
+  },
+)(result);
+```
+
+---
+
+<SplitRight>
+
+<div>
+
+# Hang on...
+
+`result` passed in another function call?
+
+<video
+  src="https://media.giphy.com/media/nTfdeBvfgzV26zjoFP/giphy.mp4"
+  autoPlay
+  loop
+  muted
+/>
+
+</div>
+
+```typescript
+either.match(
+  (error) => {
+    // Process the `Left` error
+  },
+  (value) => {
+    // Process the `Right` value
+  },
+)(result);
+```
+
+</SplitRight>
+
+---
+
+# `pipe`-ing
+
+- Express logic as a single _pipeline_
+- A value is _piped_ through multiple functions in order
+- The output of one function is the input to the next function
+
+```typescript
+import { pipe } from "fp-ts/function";
+
+const result = pipe(
+  5,
+  (value) => value * 2,
+  (value) => value + 5,
+);
+expect(result).toEqual(15);
+```
+
+---
+
+# `pipe` ❤️ `Either`
+
+```typescript
+import { either } from "fp-ts;";
+import { pipe } from "fp-ts/function";
+
+// Pseudo-code: let's pretend `fetch` is synchronous for now.
+
+const fetchPerson = (personId: number) =>
+  pipe(
+    safeFetch(`https://swapi.dev/api/people/${personId}/`),
+    either.chainW(ensureResponseOk),
+    either.chainW(safeResponseJSON),
+  );
+
+// vs
+
+const fetchPersonUnpiped = (personId: number) => {
+  const fetchResult = safeFetch(`https://swapi.dev/api/people/${personId}/`);
+  const ensureResponseOkResult = either.chainW(ensureResponseOk)(fetchResult);
+  return either.chainW(safeResponseJSON)(ensureResponseOkResult);
+};
+```
+
+---
+
+# `pipe` benefits
+
+1. Branching (if/else) happens mostly under the hook (error propagation in
+   `Either`)
+
+2. Single logic flow
+
+3. No need to name the intermediate step results (can be a downside for some)
+
+4. Allows for type inference in `Either` and other `fp-ts` types
+
+---
+
+# `flow`
+
+A cousin of `pipe`. Prepares the pipeline, but does not start it
+
+```typescript
+import { flow } from "fp-ts/function";
+
+/** @type {(value: number) => number} */
+const processNumber: (value: number) => number = flow(
+  (value) => value * 2,
+  (value) => value + 5,
+);
+
+expect(processNumber(5)).toEqual(15);
+expect(processNumber(8)).toEqual(21);
+```
+
+---
+
+# `chainW`
+
+_wide_ version of `chain` - looser types.
+[FAQ answer about the `W` suffix](https://gcanti.github.io/fp-ts/guides/code-conventions.html#what-a-w-suffix-means-eg-chainw-or-chaineitherkw).
+
+For `Either`:
+
+1. [`chain`](https://gcanti.github.io/fp-ts/modules/Either.ts.html#chain)
+
+   ```typescript
+   const chain: <E, A, B>(
+     f: (a: A) => Either<E, B>,
+   ) => (ma: Either<E, A>) => Either<E, B>;
+   ```
+
+   Error type for the input and the callback result must be the same.
+
+2. [`chainW`](https://gcanti.github.io/fp-ts/modules/Either.ts.html#chainw)
+
+   ```typescript
+   const chainW: <E2, A, B>(
+     f: (a: A) => Either<E2, B>,
+   ) => <E1>(ma: Either<E1, A>) => Either<E2 | E1, B>;
+   ```
+
+   Input and callback result can have different error types.
+
+---
+
+# Asynchrony in `fp-ts`
+
+[Task](https://gcanti.github.io/fp-ts/modules/Task.ts.html)
+
+```typescript
+interface Task<A> {
+  (): Promise<A>;
+}
+```
+
+Why a function that returns a `Promise`?
+
+- does not start immediately => pure
+- can be _retried_ by just calling it again
+- the caller decides when it runs if there are multiple `Task`s
+
+  - All in parallel?
+  - Sequentially?
+  - A window of X `Task`s at the same time?
+
+---
+
+# Example `Task`s
+
+```typescript
+import { task } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
+
+const alwaysFive: task.Task<number> = () => Promise.resolve(5);
+const delayedRandomNumber: task.Task<number> = () =>
+  new Promise((resolve) => setTimeout(() => resolve(Math.random()), 1000));
+
+/** @type {() => Promise<number>} */
+const result = pipe(
+  alwaysFive,
+  task.map((value) => value * 2),
+  task.chain((value) =>
+    pipe(
+      delayedRandomNumber,
+      task.map((randomNumber) => value * randomNumber),
+    ),
+  ),
+);
+
+result().then((value) => {
+  console.log(value);
+});
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzjAhgZwNZwL5wGZQQhwBEeYAtDGiQNwBQoksicYwYApjvocWZWoB6ADbAARkLwBXAHYBjGMAiy69evJVp4KEQHcUATzQAxYADdOALmToMAOgAqdgDyzpIcZygA+OAF44AAoASgC-AAU+YDROeyhONAgRSyCAVhCGTVltOAATThEjTjyAJRRZPKIAOQ8vKBtUTCdXd09vP0DQ8Po4OFlOPTgoohjOIKCEpJTOMP8-WJhHUE4IaRgJub8p5NSAWRQYAAt4iqqQUJCAGjgARgAGR5DM9SEAKje4AAEYQy5EbrzYbRWJuOodXBvIQaLTwKbSETwQLsLhBXpwXQGYxmSxXdFNBwgFBgCbmXTSWbhOBkkQUuCfABM13xdns8iOKGAslJ5Mp83RfRR4wFfXyhWKZTONXBUDxotFBPsRJJkylIFq7SgW2pvPpcCgao19WZ8pNcGZL3o8MRoXsx043KCNIp2oQ6Oy0ziIggAHMnbyXthMkA)
+
+---
+
+# Asynchronous failures
+
+- `Task` must never fail. The `Promise` must always resolve with some value `T`
+- Use `Either` as `T` to resolve with an error
+
+```typescript
+import { either, task } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
+
+const delayedRandomNumber: task.Task<number> = () =>
+  new Promise((resolve) => setTimeout(() => resolve(Math.random()), 1000));
+
+/** @type {(value: number) => either.Either<"unlucky number", number>} */
+const isLuckyNumber = either.fromPredicate(
+  (value: number) => value < 0.2,
+  () => "unlucky number" as const,
+);
+
+/** @type {() => Promise<either.Either<"unlucky number", number>>} */
+const result = pipe(delayedRandomNumber, task.map(isLuckyNumber));
+
+result().then(
+  either.match(
+    (error) => {
+      console.log("Error", error);
+    },
+    (value) => {
+      console.log("Got result", value);
+    },
+  ),
+);
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzgU2DAFsqAaOMCGAzgNZwC+cAZlBCHAESVgC0Mh9A3AFCiSyJwwwMMnJUadRizYB6ADbAARjMoBXAHYBjGMAjrOXLpr2F4AE2Rz8AT2RmASvnVnaAOVUhFWAFx4ixADoAFX8AHnUPLygAPjgAXjgACgBKeOiuODh1ZAB3OAAFCWBCZETEqGRCCDkAN2RUuNiSmCDQZAhVGDKG2Iqq2tKAWXwMAKgnFxAU5NwARgAGReTk7i4ZACp1uAABGGsRRESa-DlVZF8IzywelDRMKACAUTusUPoNU81iayzIrHpcJcotEKOsZEYTPBigAZVRfazuK5QeK3DBYALUWiFOzATQjUoZJLHU7nX5Im7Es5wUJweYBABM2EJKTSDA+cO+ZKi9DgRDgxnUpiZK0MGy2u32ogQLMaBSKJVCqDRD2eyre7PhXP+gL+MRBcDBEMF8D6qjk8ASQhEiQsVlsDgmbl1uAIJACIHwYESMI5CN1y1WpvNKQCaPUiUJSvu7pGmnQEcymUSWBoUBuCEJif5JmqyACcggAHNEvRHlBUwCUOXoCKs2QmVmjiczunM4mBf08wXi-QAOIQE2VM0wSuU+rcOsNuAzLgioA)
+
+---
+
+# `TaskEither`
+
+- [`TaskEither<E, A>`](https://gcanti.github.io/fp-ts/modules/TaskEither.ts.html)
+  is equivalent to `Task<Either<E, A>>`
+
+  ```typescript
+  interface TaskEither<E, A> extends Task<Either<E, A>> {}
+  ```
+
+```typescript
+import { either, task, taskEither } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
+
+const delayedRandomNumber: task.Task<number> = () =>
+  new Promise((resolve) => setTimeout(() => resolve(Math.random()), 1000));
+
+const isLuckyNumber = either.fromPredicate(
+  (value: number) => value < 0.2,
+  () => "unlucky number" as const,
+);
+
+const delayedLuckyNumber = pipe(delayedRandomNumber, task.map(isLuckyNumber));
+
+const result = pipe(
+  delayedLuckyNumber,
+  taskEither.chain((num1) =>
+    pipe(
+      delayedLuckyNumber,
+      taskEither.map((num2) => num1 * num2),
+    ),
+  ),
+);
+
+result().then(
+  either.match(
+    (error) => {
+      console.log("Error", error);
+    },
+    (value) => {
+      console.log("Got result", value);
+    },
+  ),
+);
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzgU2DAFsqAaOMCGAzgNa4EkCiamUcAvnAGZQQhwBEjYAtDIewG4AUKEixEcMMDDJ6TFm048+AegA2wAEYrGAVwB2AYxjAI+wUKGGzheABNka-AE9kdgEr59d1gDldIJpYAFx4RMQAdAAq4QA8+gFBUAB8cAC8cAAUAJTpyUJwcPrIAO5wAAoKwITImZlQyIQQagBuyLlpqTUwUaDIELowdR2pDU2ttQCy+BgRUF4+IDnZuACMAAyb2dnCQioAVPtwAAIwzjKImS34arrIoQmBWCMo1FgRVBhYsewGt4bEZxFRJYdi4R5JZIMfYqKw2eDVAAyugBzn8T1oGVQXygEWYrEqbmAhhmtQKWWut3uwIxL0pdzgsTg6wiACZsOScnkOH8UYCaUl2HAiHBrPpbBydpYxbY4A4nK47MjUeikulJNJavKXG5PN4-CCcGESBEQPgwJkkXy0YbtrsDkdTudZAguZ0KlUarFsTQPm8oD9eaiBaDwYbklC4DC4eL4GNdGp4BkpDJMuTtYrlYDVVgOYVyMRPr7DOh8MB9HVHqsRuTCimyYVG3LHDqldaczha42C0X3maLZlHqyXlWozTh3nGytydOpUJ44mchEvhXyT6+zMS2mm5ksCwoC8EF3CjLmsgImoIABzTLsChQfdglAP6BSpt0SeFK43O6H4+imwzwva9bwAcQgONGgTGAn3pdphHfSdZ2EIA)
+
+---
+
+# Revisiting the first example
+
+```typescript
+import { either, taskEither } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
+
+const safeFetch =
+  (
+    ...args: Parameters<typeof fetch>
+  ): taskEither.TaskEither<"network-error", Response> =>
+  () =>
+    new Promise((resolve) =>
+      fetch(...args).then(
+        (res) => resolve(either.right(res)),
+        (_error) => resolve(either.left("network-error")),
+      ),
+    );
+
+const ensureResponseOk = either.fromPredicate(
+  (response: Response) => response.ok,
+  () => "response-not-ok" as const,
+);
+
+const safeResponseJSON =
+  (response: Response): taskEither.TaskEither<"json-parse-error", unknown> =>
+  () =>
+    response
+      .json()
+      .then(either.right, (_error) => either.left("json-parse-error"));
+
+const fetchPerson = (personId: number) =>
+  pipe(
+    safeFetch(`https://swapi.dev/api/people/${personId}/`),
+    taskEither.chainEitherKW(ensureResponseOk),
+    taskEither.chainW(safeResponseJSON),
+  );
+
+const run = pipe(
+  fetchPerson(1),
+  taskEither.match(
+    (error) => {
+      if (error === "network-error") {
+        console.log("There was a network error. You may be offline");
+      } else if (error === "response-not-ok") {
+        console.log("Server returned with an error");
+      } else if (error === "json-parse-error") {
+        console.log("Could not parse the result from the server");
+      } else {
+        // Has type `never`
+        error;
+      }
+    },
+    (person) => {
+      console.log(person.name);
+    },
+  ),
+);
+
+// Important! Starts the tasks!
+run();
+```
+
+[TypeScript playground](https://www.typescriptlang.org/play?#code/JYWwDg9gTgLgBAbzgU2DAFsqAaOMCGAzgNYCiamUcAvnAGZQQhwBEdYAtDISwNwBQoSLERwwwMMhr1GzNp24B6ADbAARoroBXAHYBjGMAg6+-fnuOF4hfHWQAxZDD3o4AXn5w4ACk9e4AHRB+FAA5oQAXHAACiH4IE5YhAA8MACekhB09E4uAHx+AJRRBCTkGFgBACpEZBRYySw6TgDu0MQcWIxQLLgASsiEkDqEyHnuBV7ehRN+Xs0tMbLAo97eUIMQygBuyDNuk-5eds7o3kEBIeGFARU6vkdH64P74xuEW7veqBVQAVDAULoGDPQiFQrYOaPbwAfS60FecHen2Q33qf2UyDoIKarXanSg3RY4MhjzgEKhhQE5ks8GQIy0GwGQ0syAA8sR3Ch0QEGExohsACbAPT4GCovyg4ajKLM6V7CZIwbygIQYiknyIljveUcHQQGAcNUsOBEOAWEYwSFUswWqxwGx2OWsgBSAGU2QA5dySnWs2XK1nFPC1cqUaqh9GNABWHx0HDAIVGBKJuF0xH1LR04wOkteUL9I2QUK8AVjxmmJcCdzRv3+gOBuFh8KgiJ+4cx2O8LHL8cTUGTLeJNpplpyp2iSWMXO8kgHxgAkoKojotCA1Fh815xJIHv5HQ5cmcAAbAmBgSKKRSEFr4cQBQXIbaKO-ARSZMCYxQAEgQc7jS7UIox4UkcpR1HWLj4MAOhhlgADSADq3wMkygZFhyoH+OBcF-FBMHIQezpFu6XpYSOdrwFAuhcjuErHEek7zvcACMWE4TyIBii4e5TC2iIIFWwDZN8hLQO4bhuKwzQwG0UAdEOMyCWSXh2lsyABMoEChN2VSUFIt6EKacAyXJnItgEcAAJoQFocBcWkcAbnAWR0KozTEgIZK0MgyijHAwk+C2ElSdq6HJvqhrGkpVaqZY6madp3ZulguxUBsMCMs0gpwC0FCmjoKBiT0NreSgflSIFondCFrC9gmSbICm0DEogsXmvFmKJTpLAAMK2coOWRWIjV4JgSqEFoyjwHyzAVA6qVYJ5VY+RVbUqXAV5wAAEma6SSHAx7NGlx7tS2XmPNQULUBqUz-sYAlVmpXVaTp906AEOjxHsF1eDdRTWtSW0LuA0AEDoMAAIRwG6BCwEZ83gYQkP8NR9w2kAA)
+
+---
+
+# Tips and tricks
+
+---
+
+## Reading the docs
+
+- [Example documentation: `TaskEither`](https://gcanti.github.io/fp-ts/modules/TaskEither.ts.html)
+- Lots of types, usually little description
+- Figure out what the function does based on its types. Example:
+
+  ```typescript
+  const mapLeft: <E, G>(
+    f: (e: E) => G,
+  ) => <A>(fa: TaskEither<E, A>) => TaskEither<G, A>;
+  ```
+
+- Read the implementation in
+  [the `fp-ts` GitHub repo](https://github.com/gcanti/fp-ts).
+
+  [Implementation of `TaskEither.ts`](https://github.com/gcanti/fp-ts/blob/master/src/TaskEither.ts)
+
+---
+
+## Dealing with type errors
+
+import hoverOverFunctionDefinitionPath from "./static/hover-over-function-definition.png";
+import { FixedSizeImage } from "./components/FixedSizeImage";
+
+### Hover over the function definition to see the inferred types
+
+<img
+  src={hoverOverFunctionDefinitionPath}
+  alt="Hovering over the function definition reveals more type information"
+/>
+
+---
+
+### Add more granular type annotations
+
+- help pinpoint the problem
+- result in smaller and more precise diagnostics (usually)
+
+import debuggingTypeError2Path from "./static/debugging-type-error-part-2.png";
+
+---
+
+import debuggingTypeError1Path from "./static/debugging-type-error-part-1.png";
+import { ImageWithLabel } from "./components/ImageWithLabel";
+
+<ImageWithLabel label="Hard-to-understand type error">
+  <img src={debuggingTypeError1Path} />
+</ImageWithLabel>
+
+---
+
+<ImageWithLabel label="More precise type error after adding a type annotation">
+  <img src={debuggingTypeError2Path} />
+</ImageWithLabel>
+
+---
+
+Pretending to write new functions in `pipe` to get information about the piped
+value
+
+import debuggingTypeError3Path from "./static/debugging-type-error-part-3.mp4";
+import { PostponedVideo } from "./components/PostponedVideo";
+
+<PostponedVideo src={debuggingTypeError3Path} controls />
+
+---
+
+# Bonus: [`Option`](https://gcanti.github.io/fp-ts/modules/Option.ts.html) vs `undefined`
+
+```typescript
+type Option<A> = None | Some<A>;
+```
+
+- Represents a nullable value (may not exist).
+- Similar to `T | undefined` **when
+  [`strictNullChecks`](https://www.typescriptlang.org/tsconfig#strictNullChecks)
+  are enabled**
+
+  - `T | undefined` becomes just `T` when `strictNullChecks: false`
+
+    TypeScript _forgets_ about nullability.
+
+  - same with `T | null`
+
+- I prefer `Option<T>` compared to `T | undefined` for its chainability
+
+---
+
+# `Option` example
+
+```typescript
+const [irNodeResult, setIRNodeResult] = useState<
+  option.Option<either.Either<IRParsingError, ObjectIRNode>>
+>(option.none);
+
+const formProperties = useMemo(
+  () =>
+    pipe(
+      irNodeResult,
+      option.chain(option.getRight), // transforms `Either<E, A>` to `Option<A>`
+      option.map((irNode) => getUseFormProps(irNode) as UseFormProps<FormData>),
+      option.getOrElse((): UseFormProps<FormData> => ({})),
+    ),
+  [irNodeResult],
+);
+```
+
+---
+
+# Why I like `fp-ts`
+
+- Concise syntax
+
+- Dopamine hit when every puzzle falls into place and types match
+
+- Usually: if it passes type-checking, it works
+
+- Brings precise error-handling to the forefront
+
+---
+
+# Q&A

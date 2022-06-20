@@ -3,7 +3,7 @@ import React from "react";
 import styled from "@emotion/styled";
 
 const Label = styled("div")({
-  fontSize: "0.8rem",
+  fontSize: "1.8rem",
 });
 
 /**
