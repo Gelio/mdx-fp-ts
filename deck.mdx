@@ -955,4 +955,41 @@ const formProperties = useMemo(
 
 ---
 
+# Takeaways
+
+<Steps>
+
+1. `pipe` to apply multiple operations on some value (aka. chaining)
+
+2. Many data containers
+
+   1. `Either<E, A>` for precise error handling and built-in error propagation
+
+   2. `Task<T>` instead of `Promise<T>` for asynchronous operations that cannot
+      fail
+
+   3. `TaskEither<E, A>` to handle asynchronous errors
+
+   4. `Option<T>` to model nullability
+
+3. `map` for changing the inner value to some other inner value
+
+4. `chain` for changing the replacing the container based on the inner value
+
+5. `match` to unwrap the results
+
+</Steps>
+
+---
+
+- There are many specialized modules in `fp-ts` (e.g. `TaskOption`,
+  `ReadonlyArray`, `ReadonlyNonEmptyArray`)
+
+- There are many specialized functions in each `fp-ts` module to reduce
+  boilerplate (e.g. `either.filterOrElseW`, `taskEither.chainFirstTaskK`)
+
+- You do not need to know all of them to be productive
+
+---
+
 # Q&A
