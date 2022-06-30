@@ -534,6 +534,96 @@ Bonus: we may get
 
 ---
 
+# `pipe` visualized
+
+```typescript
+import { pipe } from "fp-ts/function";
+
+const result = pipe(
+  5,
+  (value) => value * 2,
+  (value) => value + 5,
+);
+expect(result).toEqual(15);
+```
+
+import basicPipe1 from "./static/basic-pipe-1.png";
+
+<img src={basicPipe1} alt="Pipe visualized 1" />
+
+---
+
+import basicPipe2 from "./static/basic-pipe-2.png";
+
+<img src={basicPipe2} alt="Pipe visualized 2" />
+
+---
+
+import basicPipe3 from "./static/basic-pipe-3.png";
+
+<img src={basicPipe3} alt="Pipe visualized 3" />
+
+---
+
+# `pipe` as railway
+
+📹: [Railway Oriented Programming](https://www.youtube.com/watch?v=fYo3LN9Vf_M)
+by Scott Wlaschin
+
+import pipeTrack1 from "./static/pipe-track-1.png";
+
+<img src={pipeTrack1} alt="Pipe track 1" />
+
+---
+
+import pipeTrack2 from "./static/pipe-track-2.png";
+
+<img src={pipeTrack2} alt="Pipe track 2" />
+
+---
+
+import pipeTrack3 from "./static/pipe-track-3.png";
+
+<img src={pipeTrack3} alt="Pipe track 3" />
+
+---
+
+import pipeTrack4 from "./static/pipe-track-4.png";
+
+<img src={pipeTrack4} alt="Pipe track 4" />
+
+---
+
+import pipeTrack5 from "./static/pipe-track-5.png";
+
+<img src={pipeTrack5} alt="Pipe track 5" />
+
+---
+
+import pipeTrack6 from "./static/pipe-track-6.png";
+
+<img src={pipeTrack6} alt="Pipe track 6" />
+
+---
+
+import pipeTrack7 from "./static/pipe-track-7.png";
+
+<img src={pipeTrack7} alt="Pipe track 7" />
+
+---
+
+import pipeTrack8 from "./static/pipe-track-8.png";
+
+<img src={pipeTrack8} alt="Pipe track 8" />
+
+---
+
+import pipeTrack9 from "./static/pipe-track-9.png";
+
+<img src={pipeTrack9} alt="Pipe track 9" />
+
+---
+
 # `pipe` ❤️ `Either`
 
 ```typescript
@@ -557,6 +647,100 @@ const fetchPersonUnpiped = (personId: number) => {
   return either.chainW(safeResponseJSON)(ensureResponseOkResult);
 };
 ```
+
+---
+
+# `pipe` and `Either` as a single-track railway
+
+import pipeEitherSingleTrack1 from "./static/pipe-either-single-track-1.png";
+
+<img src={pipeEitherSingleTrack1} alt="Pipe either single track 1" />
+
+---
+
+import pipeEitherSingleTrack2 from "./static/pipe-either-single-track-2.png";
+
+<img src={pipeEitherSingleTrack2} alt="Pipe either single track 2" />
+
+---
+
+import pipeEitherSingleTrack3 from "./static/pipe-either-single-track-3.png";
+
+<img src={pipeEitherSingleTrack3} alt="Pipe either single track 3" />
+
+---
+
+import pipeEitherSingleTrack4 from "./static/pipe-either-single-track-4.png";
+
+<img src={pipeEitherSingleTrack4} alt="Pipe either single track 4" />
+
+---
+
+import pipeEitherSingleTrack5 from "./static/pipe-either-single-track-5.png";
+
+<img src={pipeEitherSingleTrack5} alt="Pipe either single track 5" />
+
+---
+
+import pipeEitherSingleTrack6 from "./static/pipe-either-single-track-6.png";
+
+<img src={pipeEitherSingleTrack6} alt="Pipe either single track 6" />
+
+---
+
+# `pipe` + `Either` as a multi-track railway
+
+import pipeEitherMultiTrack0 from "./static/pipe-either-multi-track-0.png";
+
+<img src={pipeEitherMultiTrack0} alt="Pipe either multi track 0" />
+
+---
+
+import pipeEitherMultiTrack1 from "./static/pipe-either-multi-track-1.png";
+
+<img src={pipeEitherMultiTrack1} alt="Pipe either multi track 1" />
+
+---
+
+import pipeEitherMultiTrack2 from "./static/pipe-either-multi-track-2.png";
+
+<img src={pipeEitherMultiTrack2} alt="Pipe either multi track 2" />
+
+---
+
+import pipeEitherMultiTrack3 from "./static/pipe-either-multi-track-3.png";
+
+<img src={pipeEitherMultiTrack3} alt="Pipe either multi track 3" />
+
+---
+
+import pipeEitherMultiTrack4 from "./static/pipe-either-multi-track-4.png";
+
+<img src={pipeEitherMultiTrack4} alt="Pipe either multi track 4" />
+
+---
+
+import pipeEitherMultiTrack5 from "./static/pipe-either-multi-track-5.png";
+
+<img src={pipeEitherMultiTrack5} alt="Pipe either multi track 5" />
+
+---
+
+import pipeEitherMultiTrack6 from "./static/pipe-either-multi-track-6.png";
+
+<img src={pipeEitherMultiTrack6} alt="Pipe either multi track 6" />
+
+---
+
+import pipeEitherMultiTrack7 from "./static/pipe-either-multi-track-7.png";
+
+<img src={pipeEitherMultiTrack7} alt="Pipe either multi track 7" />
+
+---
+
+import pipeEitherMultiTrack8 from "./static/pipe-either-multi-track-8.png";
+
+<img src={pipeEitherMultiTrack8} alt="Pipe either multi track 8" />
 
 ---
 
@@ -592,6 +776,24 @@ expect(processNumber(8)).toEqual(21);
 
 ---
 
+import flowPipe1 from "./static/flow-pipe-1.png";
+
+<img src={flowPipe1} alt="Flow pipe 1" />
+
+---
+
+import flowPipe2 from "./static/flow-pipe-2.png";
+
+<img src={flowPipe2} alt="Flow pipe 2" />
+
+---
+
+import flowPipe3 from "./static/flow-pipe-3.png";
+
+<img src={flowPipe3} alt="Flow pipe 3" />
+
+---
+
 # `chainW`
 
 _wide_ version of `chain` - looser types.
@@ -618,6 +820,8 @@ For `Either`:
    ```
 
    Input and callback result can have different error types.
+
+   `chainW` _merges_ possible errors.
 
 ---
 
